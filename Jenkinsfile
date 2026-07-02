@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         IMAGE_NAME = "dilwarahmed/springboot-cicd"
+        DOCKER_CREDENTIALS = "dockerhub-creds"
     }
 
     stages {
@@ -30,28 +31,53 @@ pipeline {
             }
         }
 
+        stage('Print Variables') {
+            steps {
+                sh '''
+                echo "Docker Image : ${IMAGE_NAME}"
+                echo "Build Number : ${BUILD_NUMBER}"
+                '''
+            }
+        }
+
         stage('Docker Build') {
             steps {
                 dir('app') {
-                    sh 'docker build -t $springboot-app:${BUILD_NUMBER} .'
+                    sh '''
+                    docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .
+                    docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${IMAGE_NAME}:latest
+                    '''
                 }
             }
         }
 
-        stage('Push Docker Image') {
+        stage('Docker Login & Push') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: "${DOCKER_CREDENTIALS}",
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
 
                     sh '''
                     echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                    docker push $springboot-app:${BUILD_NUMBER}
+
+                    docker push ${IMAGE_NAME}:${BUILD_NUMBER}
+                    docker push ${IMAGE_NAME}:latest
+
                     docker logout
                     '''
                 }
+            }
+        }
+
+        stage('Cleanup') {
+            steps {
+                sh '''
+                docker image prune -f
+                '''
             }
         }
     }
@@ -59,11 +85,21 @@ pipeline {
     post {
 
         success {
-            echo "Pipeline completed successfully."
+            echo "===================================="
+            echo "CI Pipeline Completed Successfully"
+            echo "Image: ${IMAGE_NAME}:${BUILD_NUMBER}"
+            echo "===================================="
         }
 
         failure {
-            echo "Pipeline failed."
+            echo "===================================="
+            echo "CI Pipeline Failed"
+            echo "Check Jenkins Console Output"
+            echo "===================================="
+        }
+
+        always {
+            cleanWs()
         }
     }
 }
