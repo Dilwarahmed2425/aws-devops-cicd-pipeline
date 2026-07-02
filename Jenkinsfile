@@ -60,7 +60,6 @@ pipeline {
                         passwordVariable: 'DOCKER_PASS'
                     )
                 ]) {
-
                     sh """
                     echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
 
@@ -74,6 +73,9 @@ pipeline {
         }
 
         stage('Debug Kubernetes') {
+            environment {
+                KUBECONFIG = "/var/lib/jenkins/.kube/config"
+            }
             steps {
                 sh '''
                 echo "======================================="
@@ -110,18 +112,18 @@ pipeline {
 
                 echo ""
                 echo "Kube Directory:"
-                ls -la ~/.kube || true
+                ls -la /var/lib/jenkins/.kube
 
                 echo ""
-                echo "Kube Config:"
-                cat ~/.kube/config || true
-
                 echo "======================================="
                 '''
             }
         }
 
         stage('Deploy to Kubernetes') {
+            environment {
+                KUBECONFIG = "/var/lib/jenkins/.kube/config"
+            }
             steps {
                 sh '''
                 kubectl apply -f k8s/deployment.yaml
@@ -129,16 +131,20 @@ pipeline {
 
                 kubectl set image deployment/springboot-app \
                 springboot-app=${IMAGE_NAME}:${BUILD_NUMBER}
+
+                kubectl rollout status deployment/springboot-app
                 '''
             }
         }
 
         stage('Verify Deployment') {
+            environment {
+                KUBECONFIG = "/var/lib/jenkins/.kube/config"
+            }
             steps {
                 sh '''
-                kubectl rollout status deployment/springboot-app
                 kubectl get deployments
-                kubectl get pods
+                kubectl get pods -o wide
                 kubectl get svc
                 '''
             }
@@ -155,7 +161,7 @@ pipeline {
         success {
             echo "===================================="
             echo "CI Pipeline Completed Successfully"
-            echo "Image: ${IMAGE_NAME}:${BUILD_NUMBER}"
+            echo "Docker Image: ${IMAGE_NAME}:${BUILD_NUMBER}"
             echo "===================================="
         }
 
