@@ -33,20 +33,20 @@ pipeline {
 
         stage('Print Variables') {
             steps {
-                sh '''
+                sh """
                 echo "Docker Image : ${IMAGE_NAME}"
                 echo "Build Number : ${BUILD_NUMBER}"
-                '''
+                """
             }
         }
 
         stage('Docker Build') {
             steps {
                 dir('app') {
-                    sh '''
+                    sh """
                     docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .
                     docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${IMAGE_NAME}:latest
-                    '''
+                    """
                 }
             }
         }
@@ -61,32 +61,50 @@ pipeline {
                     )
                 ]) {
 
-                    sh '''
-                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    sh """
+                    echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
 
                     docker push ${IMAGE_NAME}:${BUILD_NUMBER}
                     docker push ${IMAGE_NAME}:latest
 
                     docker logout
-                    '''
+                    """
                 }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh '''
+                bectl apply -f k8s/deployment.yaml
+                kubectl apply -f k8s/service.yaml
+
+                kubectl set image deployment/springboot-app \
+                springboot-app=${IMAGE_NAME}:${BUILD_NUMBER}
+                '''
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                sh 'kubectl rollout status deployment/springboot-app'
+                sh 'kubectl get deployments'
+                sh 'kubectl get pods'
+                sh 'kubectl get svc'
             }
         }
 
         stage('Cleanup') {
             steps {
-                sh '''
-                docker image prune -f
-                '''
+                sh 'docker image prune -f'
             }
         }
     }
 
     post {
-
         success {
             echo "===================================="
-            echo "CI Pipeline Completed Successfully"
+            echo "Hello Version 2"
             echo "Image: ${IMAGE_NAME}:${BUILD_NUMBER}"
             echo "===================================="
         }
