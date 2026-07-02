@@ -40,6 +40,20 @@ pipeline {
             }
         }
 
+        stage('SonarQube Analysis') {
+            steps {
+                dir('app') {
+                    withSonarQubeEnv('SonarQube') {
+                        sh '''
+                        mvn sonar:sonar \
+                        -Dsonar.projectKey=springboot-app \
+                        -Dsonar.projectName=springboot-app
+                        '''
+                    }
+                }
+            }
+        }
+                   
         stage('Docker Build') {
             steps {
                 dir('app') {
