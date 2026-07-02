@@ -73,6 +73,54 @@ pipeline {
             }
         }
 
+        stage('Debug Kubernetes') {
+            steps {
+                sh '''
+                echo "======================================="
+                echo "Current User:"
+                whoami
+
+                echo ""
+                echo "HOME:"
+                echo $HOME
+
+                echo ""
+                echo "KUBECONFIG:"
+                echo $KUBECONFIG
+
+                echo ""
+                echo "Kubectl Path:"
+                which kubectl
+
+                echo ""
+                echo "Kubectl Client Version:"
+                kubectl version --client
+
+                echo ""
+                echo "Current Context:"
+                kubectl config current-context
+
+                echo ""
+                echo "Cluster Info:"
+                kubectl cluster-info
+
+                echo ""
+                echo "Nodes:"
+                kubectl get nodes
+
+                echo ""
+                echo "Kube Directory:"
+                ls -la ~/.kube || true
+
+                echo ""
+                echo "Kube Config:"
+                cat ~/.kube/config || true
+
+                echo "======================================="
+                '''
+            }
+        }
+
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
@@ -87,10 +135,12 @@ pipeline {
 
         stage('Verify Deployment') {
             steps {
-                sh 'kubectl rollout status deployment/springboot-app'
-                sh 'kubectl get deployments'
-                sh 'kubectl get pods'
-                sh 'kubectl get svc'
+                sh '''
+                kubectl rollout status deployment/springboot-app
+                kubectl get deployments
+                kubectl get pods
+                kubectl get svc
+                '''
             }
         }
 
@@ -104,7 +154,7 @@ pipeline {
     post {
         success {
             echo "===================================="
-            echo "Hello Version 2"
+            echo "CI Pipeline Completed Successfully"
             echo "Image: ${IMAGE_NAME}:${BUILD_NUMBER}"
             echo "===================================="
         }
